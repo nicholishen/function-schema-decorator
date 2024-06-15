@@ -4,6 +4,26 @@ from pydantic import BaseModel, create_model, Field, ValidationError
 from pydantic.fields import FieldInfo
 from typing_extensions import Annotated, Literal, get_args, get_origin
 from enum import Enum
+try:
+    from schema_generation import (
+        extract_annotated_type,
+        extract_annotation_metadata,
+        type2schema,
+        get_required_params,
+        get_default_values,
+        get_param_annotations,
+        get_parameters,
+    )
+except ImportError:
+    from .schema_generation import (
+        extract_annotated_type,
+        extract_annotation_metadata,
+        type2schema,
+        get_required_params,
+        get_default_values,
+        get_param_annotations,
+        get_parameters,
+    )
 
 TYPE_MAPPING = {
     "string": str,
@@ -85,7 +105,9 @@ def create_model_from_schema(schema: Dict[str, Any]) -> BaseModel:
     return create_model(function_schema["name"] + "Model", **fields)
 
 
-def validate_llm_response(response: Any, expected_schema: Dict[str, Any]) -> Tuple[bool, Union[Dict[str, Any], str]]:
+def validate_llm_response(
+    response: Any, expected_schema: Dict[str, Any]
+) -> Tuple[bool, Union[Dict[str, Any], str]]:
     """
     Validates the LLM's response against the expected schema.
     Returns a tuple (is_valid, data) where `is_valid` is a boolean indicating if the response is valid,
@@ -94,145 +116,12 @@ def validate_llm_response(response: Any, expected_schema: Dict[str, Any]) -> Tup
     try:
         response_model = create_model_from_schema(expected_schema)
         validated_response = response_model(**response)
-        return True, validated_response.model_dump()  # Use model_dump to handle the response
+        return (
+            True,
+            validated_response.model_dump(),
+        )  # Use model_dump to handle the response
     except ValidationError as e:
         return False, e.errors()  # Return detailed error messages for LLM feedback
-
-
-def get_required_params(typed_signature: inspect.Signature) -> List[str]:
-    return [
-        k
-        for k, v in typed_signature.parameters.items()
-        if v.default == inspect.Signature.empty
-    ]
-
-
-def get_default_values(typed_signature: inspect.Signature) -> Dict[str, Any]:
-    return {
-        k: v.default
-        for k, v in typed_signature.parameters.items()
-        if v.default != inspect.Signature.empty
-    }
-
-
-def get_param_annotations(
-    typed_signature: inspect.Signature,
-) -> Dict[str, Union[Annotated[Type[Any], str], Type[Any]]]:
-    return {
-        k: v.annotation
-        for k, v in typed_signature.parameters.items()
-        if v.annotation is not inspect.Signature.empty
-    }
-
-
-def get_parameters(
-    required: List[str],
-    param_annotations: Dict[str, Union[Annotated[Type[Any], str], Type[Any]]],
-    default_values: Dict[str, Any],
-) -> Dict[str, Any]:
-    return {
-        "type": "object",
-        "properties": {
-            k: get_parameter_json_schema(k, v, default_values)
-            for k, v in param_annotations.items()
-            if v is not inspect.Signature.empty
-        },
-        "required": required,
-    }
-
-
-def get_parameter_json_schema(
-    k: str, v: Any, default_values: Dict[str, Any]
-) -> Dict[str, Any]:
-    schema = type2schema(v)
-    if k in default_values:
-        dv = default_values[k]
-        schema["default"] = dv
-
-    metadata = extract_annotation_metadata(v)
-    if metadata and metadata.description:
-        schema["description"] = metadata.description
-    else:
-        schema["description"] = k
-
-    return schema
-
-
-def extract_annotated_type(annotation: Any) -> Any:
-    if get_origin(annotation) is Annotated:
-        return get_args(annotation)[0]
-    return annotation
-
-
-def extract_annotation_metadata(annotation: Any) -> Optional[FieldInfo]:
-    if get_origin(annotation) is Annotated:
-        metadata = get_args(annotation)[1:]
-        for meta in metadata:
-            if isinstance(meta, FieldInfo):
-                return meta
-    return None
-
-
-def type2schema(annotation: Any) -> Dict[str, Any]:
-    field_info = extract_annotation_metadata(annotation)
-    base_type = extract_annotated_type(annotation)
-
-    schema = {}
-
-    if get_origin(base_type) is Literal:
-        schema = {"type": "string", "enum": list(get_args(base_type))}
-    elif isinstance(base_type, type):
-        if issubclass(base_type, bool):
-            schema = {"type": "boolean"}
-        elif issubclass(base_type, str):
-            schema = {"type": "string"}
-        elif issubclass(base_type, int) and not issubclass(base_type, bool):
-            schema = {"type": "integer"}
-        elif issubclass(base_type, float):
-            schema = {"type": "number"}
-        elif issubclass(base_type, BaseModel):
-            properties = {
-                prop_name: {
-                    **type2schema(field.annotation),
-                    "description": field.description or prop_name,
-                }
-                for prop_name, field in base_type.model_fields.items()
-            }
-            model_description = base_type.__doc__ or getattr(
-                base_type.model_config, "title", ""
-            )
-            schema = {
-                "type": "object",
-                "properties": properties,
-                "description": model_description,
-            }
-        elif issubclass(base_type, Enum):
-            schema = {"type": "string", "enum": [e.value for e in base_type]}
-    elif get_origin(base_type) is list:
-        schema = {"type": "array", "items": type2schema(get_args(base_type)[0])}
-    elif get_origin(base_type) is Union:
-        args = get_args(base_type)
-        if len(args) == 2 and type(None) in args:
-            non_none_type = args[0] if args[1] is type(None) else args[1]
-            schema = type2schema(non_none_type)
-            schema["nullable"] = True
-        else:
-            schema = {"oneOf": [type2schema(arg) for arg in args]}
-    else:
-        raise TypeError(f"Unsupported type: {base_type}")
-
-    if field_info and field_info.metadata:
-        for meta in field_info.metadata:
-            if hasattr(meta, "gt"):
-                schema["exclusiveMinimum"] = meta.gt
-            if hasattr(meta, "ge"):
-                schema["minimum"] = meta.ge
-            if hasattr(meta, "lt"):
-                schema["exclusiveMaximum"] = meta.lt
-            if hasattr(meta, "le"):
-                schema["maximum"] = meta.le
-
-    return schema
 
 
 def process_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
@@ -256,3 +145,54 @@ def process_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
         return reorder_keys(d)
 
     return recursive_reorder(schema)
+
+
+if __name__ == '__main__':
+    # Define a simple Pydantic model
+    from pydantic import BaseModel, Field
+    from typing import Annotated
+
+    class Person(BaseModel):
+        name: Annotated[str, Field(description="The name of the person")]
+        age: Annotated[int, Field(ge=0, description="The age of the person, must be non-negative")]
+
+    # Define the function to be tested
+    def process_person(person: Annotated[Person, Field(description="A person object")]) -> str:
+        """Processes a single person"""
+        return f"Processed person named {person.name} aged {person.age}"
+
+    # Generate schema
+    schema = generate_function_schema(process_person)
+    # print("Generated Schema:\n", schema)
+
+    # # Valid response
+    # valid_person = {"name": "John", "age": 30}
+    # is_valid, result = validate_llm_response(valid_person, schema)
+    # print("Valid Response:", is_valid, result)
+
+    # # Invalid response: negative age
+    # invalid_person = {"name": "John", "age": -1}
+    # is_valid, result = validate_llm_response(invalid_person, schema)
+    # print("Invalid Response:", is_valid, result)
+    # print("Processed person:", process_person(Person(**valid_person)))
+
+    # def validate_response_func(value: Annotated[str, Field(description="A string value")]) -> dict:
+    #     """Function to test response validation"""
+    #     return {"value": value}
+
+    # schema = generate_function_schema(validate_response_func)
+    # print("Generated Schema:\n", schema)
+
+    # # Valid response
+    # valid_response = {"value": "test"}
+    # is_valid, valid_result = validate_llm_response(valid_response, schema)
+    # print("Valid Response:", is_valid, valid_result)
+    # print("Processed response:", validate_response_func(valid_response["value"]))
+    # print("Processed response:", validate_response_func(**valid_response))
+    # print("Processed response:", validate_response_func(**valid_response).dict())
+    # print("Processed response:", validate_response_func(**valid_response).model_dump())
+    # print("Processed response:", validate_response_func(**valid_response).json())
+    # print("Processed response:", validate_response_func(**valid_response).dict(by_alias=True))
+    # print("Processed response:", validate_response_func(**valid_response).json(by_alias=True))
+    # print("Processed response:", validate_response_func(**valid_response).dict(by_alias=True, exclude_unset=True))
+    # print("Processed response:", validate_response_func

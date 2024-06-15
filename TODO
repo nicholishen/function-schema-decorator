@@ -1,1 +1,4 @@
 Continue the converstion: https://chatgpt.com/c/f01928b0-e2b5-410c-8abe-5b6223eb177c?model=gpt-4
+
+The latest issue is the extraction of the annotations from object properties. The types are coming in, but the Field is not getting extracted and therefore is missing the metadata eg. Ge=0
+

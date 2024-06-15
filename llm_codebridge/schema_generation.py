@@ -34,21 +34,23 @@ def extract_annotated_type(annotation: Any) -> Any:
 
 def extract_annotation_metadata(annotation: Any) -> Optional[FieldInfo]:
     """Extract the metadata from Annotated."""
+    origin = get_origin(annotation)
+    if origin is FieldInfo:
+        return annotation
     if get_origin(annotation) is Annotated:
         metadata = get_args(annotation)[1:]
         for meta in metadata:
             if isinstance(meta, FieldInfo):
+                logger.debug(f"Extracted metadata: {meta}")
                 return meta
     return None
 
 
 def type2schema(annotation: Any) -> Dict[str, Any]:
-    """Convert Python type to JSON schema type."""
-    field_info = extract_annotation_metadata(
-        annotation
-    )  # Extract metadata before processing the type
+    field_info = extract_annotation_metadata(annotation)
     base_type = extract_annotated_type(annotation)
-    logger.debug(f"Processing type: {base_type}")
+
+    print(f"Processing type: {base_type}, with metadata: {field_info}")
 
     schema = {}
 
@@ -64,17 +66,21 @@ def type2schema(annotation: Any) -> Dict[str, Any]:
         elif issubclass(base_type, float):
             schema = {"type": "number"}
         elif issubclass(base_type, BaseModel):
-            # Inline "type": "object" for BaseModel types and expand properties
-            properties = {
-                prop_name: {
-                    **type2schema(field.annotation),
-                    "description": field.description or prop_name,
+            properties = {}
+            fields_items = base_type.model_fields.items()
+            for prop_name, field in fields_items:
+                properties[prop_name] = {
+                    **type2schema(field),
+                    "description": field.field_info.description or prop_name,
                 }
-                for prop_name, field in base_type.model_fields.items()
-            }
-            model_description = base_type.__doc__ or getattr(
-                base_type.model_config, "title", ""
-            )
+            # properties = {
+            #     prop_name: {
+            #         **type2schema(field.annotation),
+            #         "description": field.field_info.description or prop_name,
+            #     }
+            #     for prop_name, field in base_type.__fields__.items()
+            # }
+            model_description = base_type.__doc__ or getattr(base_type.Config, "title", "")
             schema = {
                 "type": "object",
                 "properties": properties,
@@ -95,19 +101,24 @@ def type2schema(annotation: Any) -> Dict[str, Any]:
     else:
         raise TypeError(f"Unsupported type: {base_type}")
 
-    # Add constraints if present in metadata
     if field_info and field_info.metadata:
         for meta in field_info.metadata:
             if hasattr(meta, "gt"):
                 schema["exclusiveMinimum"] = meta.gt
+                print(f"Applied exclusiveMinimum constraint: {meta.gt}")
             if hasattr(meta, "ge"):
                 schema["minimum"] = meta.ge
+                print(f"Applied minimum constraint: {meta.ge}")
             if hasattr(meta, "lt"):
                 schema["exclusiveMaximum"] = meta.lt
+                print(f"Applied exclusiveMaximum constraint: {meta.lt}")
             if hasattr(meta, "le"):
                 schema["maximum"] = meta.le
+                print(f"Applied maximum constraint: {meta.le}")
 
+    print(f"Generated schema: {schema}")
     return schema
+
 
 
 def get_parameter_json_schema(
@@ -168,3 +179,31 @@ def get_parameters(
         },
         "required": required,
     }
+
+
+if __name__ == "__main__":
+
+    from pydantic import Field
+
+    test_annotation = Annotated[int, Field(description="The person's age, must be non-negative", ge=0)]
+    schema = type2schema(test_annotation)    
+    print(schema)
+    # # Define a simple Pydantic model
+    # from pydantic import BaseModel, Field
+    # from typing import Annotated
+
+    # class Person(BaseModel):
+    #     name: str = Field(description="The person's name")
+    #     age: Annotated[
+    #         int, Field(ge=0, description="The person's age, must be non-negative")
+    #     ]
+
+    # annotation = getattr(Person, "__annotations__")["age"]
+    # metadata = extract_annotation_metadata(annotation)
+    # base_type = extract_annotated_type(annotation)
+
+    # # Use pdb to step through the type2schema function
+    # import pdb
+
+    # # pdb.set_trace()
+    # type2schema(annotation)
