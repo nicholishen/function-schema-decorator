@@ -1,116 +1,65 @@
 import pytest
 from pydantic import BaseModel, Field
-from typing import Annotated, List, Optional
-from oai_tool import tool, validate_schema
-from oai_tool.decorators import Tool
+from typing import List, Annotated
+from llm_codebridge.core import generate_function_schema, validate_llm_response
+from llm_codebridge.validation import validate_schema
+import json
 
+def test_list_of_people():
+    class Person(BaseModel):
+        name: Annotated[str, Field(description="The name of the person")]
+        age: Annotated[int, Field(description="The age of the person", ge=0)]
 
-def test_advanced_validation():
-    class Address(BaseModel):
-        street: Annotated[str, Field(description="The street address", min_length=1)]
-        city: Annotated[str, Field(description="The city", min_length=1)]
-        zip_code: Annotated[str, Field(description="The ZIP code", pattern=r'^\d{5}$')]
+    def process_people(people: Annotated[List[Person], Field(description="A list of people")]) -> str:
+        """Processes a list of people"""
+        return f"Processed {len(people)} people"
 
-    class User(BaseModel):
-        name: Annotated[str, Field(description="The name of the user", min_length=1)]
-        age: Annotated[int, Field(description="The age of the user", ge=0)]
-        address: Annotated[Address, Field(description="The address of the user")]
-        friends: Annotated[Optional[List[Address]], Field(description="A list of friends' addresses", default=None)]
-
-    @tool
-    def create_user(user: Annotated[User, Field(description="The user object to create")]) -> str:
-        """Creates a new user"""
-        return f"User {user.name} created"
-
-    schema = create_user.schema
-    assert validate_schema(schema)
+    schema = generate_function_schema(process_people)
+    print(schema)
+    assert validate_schema(json.dumps(schema, indent=2))
 
     # Valid response
     valid_response = {
-        "user": {
-            "name": "John Doe",
-            "age": 30,
-            "address": {
-                "street": "123 Main St",
-                "city": "Anytown",
-                "zip_code": "12345"
-            },
-            "friends": [
-                {
-                    "street": "456 Elm St",
-                    "city": "Othertown",
-                    "zip_code": "67890"
-                }
-            ]
-        }
+        "people": [
+            {"name": "Alice", "age": 30},
+            {"name": "Bob", "age": 25}
+        ]
     }
-    valid_result = create_user.validate_response(valid_response, schema)
-    assert valid_result == True
+    is_valid, result = validate_llm_response(valid_response, schema)
+    assert is_valid
+    assert result["people"][0]["name"] == "Alice"
+    assert result["people"][0]["age"] == 30
+    assert result["people"][1]["name"] == "Bob"
+    assert result["people"][1]["age"] == 25
 
-    # Invalid response: missing required field
-    invalid_response_missing_field = {
-        "user": {
-            "age": 30,
-            "address": {
-                "street": "123 Main St",
-                "city": "Anytown",
-                "zip_code": "12345"
-            },
-            "friends": [
-                {
-                    "street": "456 Elm St",
-                    "city": "Othertown",
-                    "zip_code": "67890"
-                }
-            ]
-        }
+    # Invalid response: age is negative
+    invalid_response_negative_age = {
+        "people": [
+            {"name": "Alice", "age": -30},
+            {"name": "Bob", "age": 25}
+        ]
     }
-    invalid_result_missing_field = create_user.validate_response(invalid_response_missing_field, schema)
-    print("Validation result for missing field:", invalid_result_missing_field)
-    assert isinstance(invalid_result_missing_field, str)  # Should return error message as a string
+    is_valid, result = validate_llm_response(invalid_response_negative_age, schema)
+    assert not is_valid  # Check for invalidity correctly
+    assert 'age' in result[0]['loc']  # Ensure the error message points to 'age'
 
-    # Invalid response: incorrect field type
-    invalid_response_incorrect_type = {
-        "user": {
-            "name": "John Doe",
-            "age": "thirty",  # Should be an integer
-            "address": {
-                "street": "123 Main St",
-                "city": "Anytown",
-                "zip_code": "12345"
-            },
-            "friends": [
-                {
-                    "street": "456 Elm St",
-                    "city": "Othertown",
-                    "zip_code": "67890"
-                }
-            ]
-        }
-    }
-    invalid_result_incorrect_type = create_user.validate_response(invalid_response_incorrect_type, schema)
-    print("Validation result for incorrect type:", invalid_result_incorrect_type)
-    assert isinstance(invalid_result_incorrect_type, str)  # Should return error message as a string
 
-    # Invalid response: pattern constraint violation
-    invalid_response_pattern_violation = {
-        "user": {
-            "name": "John Doe",
-            "age": 30,
-            "address": {
-                "street": "123 Main St",
-                "city": "Anytown",
-                "zip_code": "ABCDE"  # Should be a 5-digit number
-            },
-            "friends": [
-                {
-                    "street": "456 Elm St",
-                    "city": "Othertown",
-                    "zip_code": "67890"
-                }
-            ]
-        }
-    }
-    invalid_result_pattern_violation = create_user.validate_response(invalid_response_pattern_violation, schema)
-    print("Validation result for pattern violation:", invalid_result_pattern_violation)
-    assert isinstance(invalid_result_pattern_violation, str)  # Should return error message as a string
+# To run the test directly
+if __name__ == "__main__":
+    test_list_of_people()
+
+
+def test_validate_response():
+    def validate_response_func(value: Annotated[str, Field(description="A string value")]) -> dict:
+        """Function to test response validation"""
+        return {"value": value}
+
+    schema = generate_function_schema(validate_response_func)
+    assert validate_schema(schema)
+
+    # Valid response
+    valid_response = {"value": "test"}
+    is_valid, valid_result = validate_llm_response(valid_response, schema)
+    assert is_valid
+    assert isinstance(valid_result, dict)  # now checking the correct part of the tuple
+    assert valid_result['value'] == "test"

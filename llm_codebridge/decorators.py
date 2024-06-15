@@ -97,7 +97,10 @@ def create_pydantic_model_from_schema(schema: Dict[str, Any]) -> BaseModel:
     for key, value in schema["function"]["parameters"]["properties"].items():
         field_type = parse_type(value)
         default = ... if key in required_fields else None
-        fields[key] = (field_type, Field(default=default, description=value.get('description', '')))
+        fields[key] = (
+            field_type,
+            Field(default=default, description=value.get("description", "")),
+        )
 
     return create_model(schema["function"]["name"] + "Model", **fields)
 
@@ -125,7 +128,9 @@ class Tool:
                 bound_args = inspect.signature(f).bind(*args, **kwargs)
                 bound_args.apply_defaults()
                 try:
-                    validated_data = {k: v for k, v in bound_args.arguments.items() if k != 'self'}
+                    validated_data = {
+                        k: v for k, v in bound_args.arguments.items() if k != "self"
+                    }
                     self.input_model(**validated_data)
                 except ValidationError as e:
                     logger.error(f"Validation error: {e}")
@@ -142,7 +147,9 @@ class Tool:
                 bound_args = inspect.signature(f).bind(*args, **kwargs)
                 bound_args.apply_defaults()
                 try:
-                    validated_data = {k: v for k, v in bound_args.arguments.items() if k != 'self'}
+                    validated_data = {
+                        k: v for k, v in bound_args.arguments.items() if k != "self"
+                    }
                     self.input_model(**validated_data)
                 except ValidationError as e:
                     logger.error(f"Validation error: {e}")
@@ -154,20 +161,28 @@ class Tool:
             wrapper.validate_response = self.validate_response
             return wrapper
 
-    def validate_response(self, response: Any, expected_schema: Dict[str, Any]) -> Union[bool, str]:
+    def validate_response(
+        self, response: Any, expected_schema: Dict[str, Any]
+    ) -> Union[bool, str]:
         """
         Validates the response against the expected schema and provides feedback if validation fails.
         This function will return True if validation is successful, or a string describing the validation errors if it fails.
         """
-        logger.info(f"Validating response: {response} against schema: {expected_schema}")
+        logger.info(
+            f"Validating response: {response} against schema: {expected_schema}"
+        )
         try:
             response_model = create_pydantic_model_from_schema(expected_schema)
-            response_model.model_validate(response)  # Use model_validate to ensure proper error handling
+            response_model.model_validate(
+                response
+            )  # Use model_validate to ensure proper error handling
             return True
         except ValidationError as e:
             error_message = e.errors()
             logger.error(f"Response validation error: {error_message}")
-            return str(error_message)  # Convert the error message to a string to satisfy the test's expectation
+            return str(
+                error_message
+            )  # Convert the error message to a string to satisfy the test's expectation
 
 
 # Wrapper function to maintain compatibility with the previous `tool` decorator
