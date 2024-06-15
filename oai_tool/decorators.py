@@ -64,28 +64,38 @@ def get_function_schema(
     return function_schema
 
 
+class Tool:
+    def __init__(self, name: Optional[str] = None, description: Optional[str] = None):
+        self.name = name
+        self.description = description
+
+    def __call__(self, f: Callable[..., Any]) -> Callable[..., Any]:
+        f._schema = get_function_schema(f, name=self.name, description=self.description)
+
+        if inspect.iscoroutinefunction(f):
+
+            async def async_wrapper(*args, **kwargs):
+                return await f(*args, **kwargs)
+
+            async_wrapper._schema = f._schema
+            return async_wrapper
+        else:
+            return f
+
+
+# Wrapper function to maintain compatibility with the previous `tool` decorator
 def tool(
     function: Optional[Callable] = None,
     *,
     name: Optional[str] = None,
     description: Optional[str] = None,
 ):
-    def actual_decorator(f: Callable[..., Any]) -> Callable[..., Any]:
-        f._schema = get_function_schema(f, name=name, description=description)
-
-        if inspect.iscoroutinefunction(f):
-
-            async def async_wrapper(*args, **kwargs):
-                return await f(*args, **kwargs)
-            async_wrapper._schema = f._schema
-
-            return async_wrapper
-        else:
-            return f
+    decorator = Tool(name=name, description=description)
 
     if function:
-        return actual_decorator(function)
-    return actual_decorator
+        return decorator(function)
+
+    return decorator
 
 
 def reorder_keys(d: Dict[str, Any]) -> Dict[str, Any]:
@@ -108,3 +118,9 @@ def process_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
     if "items" in schema:
         schema["items"] = process_schema(reorder_keys(schema["items"]))
     return reorder_keys(schema)
+
+
+# Example usage:
+# @tool(name="Add Numbers", description="Adds two integers and returns the sum.")
+# def add_numbers(a: int, b: int) -> int:
+#     return a + b
