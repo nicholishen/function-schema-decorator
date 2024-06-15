@@ -3,11 +3,12 @@ from enum import Enum
 from typing import Annotated, List, Literal, Optional, Union
 
 import pytest
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from oai_tool import tool, validate_schema
 from oai_tool.decorators import process_schema
 import asyncio
+from typing import Annotated, Dict, Any
 
 
 def test_string():
@@ -531,34 +532,6 @@ def test_enum_in_field():
     )
 
 
-def test_async_function():
-    @tool
-    async def async_func(
-        value: Annotated[str, Field(description="A string value")]
-    ) -> str:
-        """An async function that returns the string value"""
-        await asyncio.sleep(0.1)  # Simulate async operation
-        return value
-
-    schema = async_func.schema
-    assert validate_schema(schema)
-    assert schema["function"]["name"] == "async_func"
-    assert (
-        schema["function"]["description"]
-        == "An async function that returns the string value"
-    )
-    assert schema["function"]["parameters"]["properties"]["value"]["type"] == "string"
-    assert (
-        schema["function"]["parameters"]["properties"]["value"]["description"]
-        == "A string value"
-    )
-    assert schema["function"]["async"]
-
-    # Testing the actual function
-    result = asyncio.run(async_func("test"))
-    assert result == "test"
-
-
 def test_regular_function():
     @tool
     def add_numbers(
@@ -619,5 +592,51 @@ def test_class_method():
     assert result == 7
 
 
-if __name__ == "__main__":
-    pytest.main()
+def test_async_function():
+
+    @tool
+    async def async_func(
+        value: Annotated[str, Field(description="A string value")]
+    ) -> str:
+        """An async function that returns the string value"""
+        await asyncio.sleep(0.1)  # Simulate async operation
+        return value
+
+    schema = async_func.schema
+    assert validate_schema(schema)
+    assert schema["function"]["name"] == "async_func"
+    assert (
+        schema["function"]["description"]
+        == "An async function that returns the string value"
+    )
+    assert schema["function"]["parameters"]["properties"]["value"]["type"] == "string"
+    assert (
+        schema["function"]["parameters"]["properties"]["value"]["description"]
+        == "A string value"
+    )
+    assert schema["function"]["async"]
+
+    # Testing the actual function
+    result = asyncio.run(async_func("test"))
+    assert result == "test"
+
+def test_validate_response():
+    @tool
+    def validate_response_func(
+        value: Annotated[str, Field(description="A string value")]
+    ) -> dict:
+        """Function to test response validation"""
+        return {"value": value}
+
+    schema = validate_response_func.schema
+    assert validate_schema(schema)
+
+    # Valid response
+    valid_response = {"value": "test"}
+    valid_result = validate_response_func.validate_response(valid_response, schema)
+    assert valid_result == True
+
+    # Invalid response
+    invalid_response = {"wrong_key": "test"}
+    invalid_result = validate_response_func.validate_response(invalid_response, schema)
+    assert isinstance(invalid_result, str)  # S
