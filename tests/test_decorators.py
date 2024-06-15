@@ -16,7 +16,7 @@ def test_string():
         """A string value"""
         return value
 
-    schema = test_string._schema
+    schema = test_string.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "test_string"
     assert schema["function"]["description"] == "A string value"
@@ -34,7 +34,7 @@ def test_number():
     ) -> float:
         return value
 
-    schema = test_number._schema
+    schema = test_number.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "test_number"
     assert schema["function"]["description"] == "A number value"
@@ -53,7 +53,7 @@ def test_integer():
         """An integer value"""
         return value
 
-    schema = test_integer._schema
+    schema = test_integer.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "test_integer"
     assert schema["function"]["description"] == "An integer value"
@@ -71,7 +71,7 @@ def test_boolean():
     ) -> bool:
         return value
 
-    schema = test_boolean._schema
+    schema = test_boolean.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "test_boolean"
     assert schema["function"]["description"] == "A boolean value"
@@ -90,7 +90,7 @@ def test_array():
         """An array of strings"""
         return value
 
-    schema = test_array._schema
+    schema = test_array.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "test_array"
     assert schema["function"]["description"] == "An array of strings"
@@ -117,7 +117,7 @@ def test_object():
         """An object value"""
         return value
 
-    schema = test_object._schema
+    schema = test_object.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "test_object"
     assert schema["function"]["description"] == "An object value"
@@ -140,7 +140,7 @@ def test_enum():
         """An enum value"""
         return value
 
-    schema = test_enum._schema
+    schema = test_enum.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "test_enum"
     assert schema["function"]["description"] == "An enum value"
@@ -165,7 +165,7 @@ def test_const():
     ) -> str:
         return value
 
-    schema = test_const._schema
+    schema = test_const.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "test_const"
     assert schema["function"]["description"] == "A constant value"
@@ -200,7 +200,7 @@ def test_create_user():
         """Creates a new user"""
         return f"User {user.name} created"
 
-    schema = create_user._schema
+    schema = create_user.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "create_user"
     assert schema["function"]["description"] == "Creates a new user"
@@ -230,7 +230,7 @@ def test_list_of_objects():
         """Processes a list of objects"""
         return f"Processed {len(objects)} objects"
 
-    schema = process_objects._schema
+    schema = process_objects.schema
     reordered_schema = process_schema(schema)
 
     assert validate_schema(reordered_schema)
@@ -271,7 +271,7 @@ def test_complex_literals():
         """Function with complex literals"""
         return value
 
-    schema = complex_literals._schema
+    schema = complex_literals.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "complex_literals"
     assert schema["function"]["description"] == "Function with complex literals"
@@ -292,7 +292,7 @@ def test_no_parameters():
         """Function with no parameters"""
         return "No parameters"
 
-    schema = no_params._schema
+    schema = no_params.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "no_params"
     assert schema["function"]["description"] == "Function with no parameters"
@@ -312,7 +312,7 @@ def test_union_types():
         """Function with union types"""
         return str(value)
 
-    schema = union_types._schema
+    schema = union_types.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "union_types"
     assert schema["function"]["description"] == "Function with union types"
@@ -336,7 +336,7 @@ def test_optional_parameters():
         """Function with optional parameters"""
         return required_value + (optional_value or "")
 
-    schema = optional_params._schema
+    schema = optional_params.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "optional_params"
     assert schema["function"]["description"] == "Function with optional parameters"
@@ -367,7 +367,7 @@ def test_empty_strings_and_lists():
         """Handles empty strings and lists"""
         return f"String: {empty_string}, List: {empty_list}"
 
-    schema = handle_empty._schema
+    schema = handle_empty.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "handle_empty"
     assert schema["function"]["description"] == "Handles empty strings and lists"
@@ -400,7 +400,7 @@ def test_positive_number():
         """Function with a number that must be greater than 0"""
         return f"The number is {value}"
 
-    schema = positive_number._schema
+    schema = positive_number.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "positive_number"
     assert (
@@ -432,7 +432,7 @@ def test_rank_feedback():
         """Function to rank customer's feedback on a scale of 1 to 10"""
         return f"The feedback rank is {value}"
 
-    schema = rank_feedback._schema
+    schema = rank_feedback.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "rank_feedback"
     assert (
@@ -463,7 +463,7 @@ def test_process_temperature():
         """Function to process temperature in Celsius"""
         return f"The temperature is {temperature}°C"
 
-    schema = process_temperature._schema
+    schema = process_temperature.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "process_temperature"
     assert (
@@ -512,7 +512,7 @@ def test_enum_in_field():
             "condition": "Sunny",
         }
 
-    schema = get_current_weather._schema
+    schema = get_current_weather.schema
     print("Schema for get_current_weather:", schema)
     assert validate_schema(schema)
     assert schema["function"]["name"] == "get_current_weather"
@@ -540,7 +540,7 @@ def test_async_function():
         await asyncio.sleep(0.1)  # Simulate async operation
         return value
 
-    schema = async_func._schema
+    schema = async_func.schema
     assert validate_schema(schema)
     assert schema["function"]["name"] == "async_func"
     assert (
@@ -557,6 +557,66 @@ def test_async_function():
     # Testing the actual function
     result = asyncio.run(async_func("test"))
     assert result == "test"
+
+
+def test_regular_function():
+    @tool
+    def add_numbers(
+        a: Annotated[int, Field(description="The first number")],
+        b: Annotated[int, Field(description="The second number")],
+    ) -> int:
+        """Adds two integers and returns the sum."""
+        return a + b
+
+    schema = add_numbers.schema
+    assert validate_schema(schema)
+    assert schema["function"]["name"] == "add_numbers"
+    assert schema["function"]["description"] == "Adds two integers and returns the sum."
+    assert schema["function"]["parameters"]["properties"]["a"]["type"] == "integer"
+    assert (
+        schema["function"]["parameters"]["properties"]["a"]["description"]
+        == "The first number"
+    )
+    assert schema["function"]["parameters"]["properties"]["b"]["type"] == "integer"
+    assert (
+        schema["function"]["parameters"]["properties"]["b"]["description"]
+        == "The second number"
+    )
+
+    result = add_numbers(3, 4)
+    assert result == 7
+
+
+class Calculator:
+    @tool
+    def add(
+        self,
+        a: Annotated[int, Field(description="The first number")],
+        b: Annotated[int, Field(description="The second number")],
+    ) -> int:
+        """Adds two integers and returns the sum."""
+        return a + b
+
+
+def test_class_method():
+    calc = Calculator()
+    schema = calc.add.schema
+    assert validate_schema(schema)
+    assert schema["function"]["name"] == "add"
+    assert schema["function"]["description"] == "Adds two integers and returns the sum."
+    assert schema["function"]["parameters"]["properties"]["a"]["type"] == "integer"
+    assert (
+        schema["function"]["parameters"]["properties"]["a"]["description"]
+        == "The first number"
+    )
+    assert schema["function"]["parameters"]["properties"]["b"]["type"] == "integer"
+    assert (
+        schema["function"]["parameters"]["properties"]["b"]["description"]
+        == "The second number"
+    )
+
+    result = calc.add(3, 4)
+    assert result == 7
 
 
 if __name__ == "__main__":

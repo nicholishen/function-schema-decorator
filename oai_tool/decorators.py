@@ -2,7 +2,6 @@
 Purpose: Provides decorators and functions to generate function schemas and decorate functions with schema metadata.
 Functions:
 get_function_schema: Generates a schema for a given function.
-tool: Decorator to add schema metadata to a function.
 reorder_keys: Reorders keys in a dictionary to ensure 'description' is first.
 process_schema: Recursively reorders keys in a schema.
 """
@@ -28,6 +27,7 @@ def get_function_schema(
     *,
     name: Optional[str] = None,
     description: Optional[str] = None,
+    is_method: bool = False,
 ) -> Dict[str, Any]:
     typed_signature = inspect.signature(f)
     required = get_required_params(typed_signature)
@@ -43,6 +43,14 @@ def get_function_schema(
 
     fname = name if name else f.__name__
     fdescription = description if description else f.__doc__ or ""
+
+    if is_method:
+        # Remove 'self' or 'cls' from parameters
+        param_annotations.pop('self', None)
+        param_annotations.pop('cls', None)
+        required = [r for r in required if r not in ('self', 'cls')]
+        default_values.pop('self', None)
+        default_values.pop('cls', None)
 
     parameters = get_parameters(
         required, param_annotations, default_values=default_values
@@ -70,14 +78,13 @@ class Tool:
         self.description = description
 
     def __call__(self, f: Callable[..., Any]) -> Callable[..., Any]:
-        f._schema = get_function_schema(f, name=self.name, description=self.description)
+        is_method = 'self' in inspect.signature(f).parameters or 'cls' in inspect.signature(f).parameters
+        f.schema = get_function_schema(f, name=self.name, description=self.description, is_method=is_method)
 
         if inspect.iscoroutinefunction(f):
-
             async def async_wrapper(*args, **kwargs):
                 return await f(*args, **kwargs)
-
-            async_wrapper._schema = f._schema
+            async_wrapper.schema = f.schema
             return async_wrapper
         else:
             return f
@@ -91,10 +98,10 @@ def tool(
     description: Optional[str] = None,
 ):
     decorator = Tool(name=name, description=description)
-
+    
     if function:
         return decorator(function)
-
+    
     return decorator
 
 
