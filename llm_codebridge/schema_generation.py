@@ -49,9 +49,6 @@ def extract_annotation_metadata(annotation: Any) -> Optional[FieldInfo]:
 def type2schema(annotation: Any) -> Dict[str, Any]:
     field_info = extract_annotation_metadata(annotation)
     base_type = extract_annotated_type(annotation)
-
-    print(f"Processing type: {base_type}, with metadata: {field_info}")
-
     schema = {}
 
     if get_origin(base_type) is Literal:
@@ -102,18 +99,12 @@ def type2schema(annotation: Any) -> Dict[str, Any]:
         for meta in field_info.metadata:
             if hasattr(meta, "gt"):
                 schema["exclusiveMinimum"] = meta.gt
-                print(f"Applied exclusiveMinimum constraint: {meta.gt}")
             if hasattr(meta, "ge"):
                 schema["minimum"] = meta.ge
-                print(f"Applied minimum constraint: {meta.ge}")
             if hasattr(meta, "lt"):
                 schema["exclusiveMaximum"] = meta.lt
-                print(f"Applied exclusiveMaximum constraint: {meta.lt}")
             if hasattr(meta, "le"):
                 schema["maximum"] = meta.le
-                print(f"Applied maximum constraint: {meta.le}")
-
-    print(f"Generated schema: {schema}")
     return schema
 
 
@@ -175,33 +166,3 @@ def get_parameters(
         },
         "required": required,
     }
-
-
-if __name__ == "__main__":
-
-    from pydantic import Field
-
-    test_annotation = Annotated[
-        int, Field(description="The person's age, must be non-negative", ge=0)
-    ]
-    schema = type2schema(test_annotation)
-    print(schema)
-    # # Define a simple Pydantic model
-    # from pydantic import BaseModel, Field
-    # from typing import Annotated
-
-    # class Person(BaseModel):
-    #     name: str = Field(description="The person's name")
-    #     age: Annotated[
-    #         int, Field(ge=0, description="The person's age, must be non-negative")
-    #     ]
-
-    # annotation = getattr(Person, "__annotations__")["age"]
-    # metadata = extract_annotation_metadata(annotation)
-    # base_type = extract_annotated_type(annotation)
-
-    # # Use pdb to step through the type2schema function
-    # import pdb
-
-    # # pdb.set_trace()
-    # type2schema(annotation)

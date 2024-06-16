@@ -101,8 +101,9 @@ def create_model_from_schema(schema: Dict[str, Any]) -> BaseModel:
             field_type,
             Field(default=default, description=value.get("description", "")),
         )
-
-    return create_model(function_schema["name"] + "Model", **fields)
+    print(f'Fields: {fields}')
+    res_model = create_model(function_schema["name"] + "Model", **fields)
+    return res_model
 
 
 def validate_llm_response(
@@ -114,8 +115,12 @@ def validate_llm_response(
     and `data` is either the validated data or an error message string.
     """
     try:
+        print(f'Response: {response}')
+        print(f'Expected schema: {expected_schema}')
         response_model = create_model_from_schema(expected_schema)
+        print(f'Response model: {response_model}')
         validated_response = response_model(**response)
+        print(f'Validated response: {validated_response}')
         return (
             True,
             validated_response.model_dump(),
@@ -145,22 +150,3 @@ def process_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
         return reorder_keys(d)
 
     return recursive_reorder(schema)
-
-
-if __name__ == '__main__':
-    # Define a simple Pydantic model
-    from pydantic import BaseModel, Field
-    from typing import Annotated
-
-    class Person(BaseModel):
-        name: Annotated[str, Field(description="The name of the person")]
-        age: Annotated[int, Field(ge=0, description="The age of the person, must be non-negative")]
-
-    # Define the function to be tested
-    def process_person(person: Annotated[Person, Field(description="The person of interest.")]) -> str:
-        """Processes a single person"""
-        return f"Processed person named {person.name} aged {person.age}"
-
-    # Generate schema
-    schema = generate_function_schema(process_person)
-   
