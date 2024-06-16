@@ -67,20 +67,17 @@ def type2schema(annotation: Any) -> Dict[str, Any]:
             schema = {"type": "number"}
         elif issubclass(base_type, BaseModel):
             properties = {}
-            fields_items = base_type.model_fields.items()
-            for prop_name, field in fields_items:
+            for prop_name, field_info in base_type.model_fields.items():
+                annotated_type = Annotated[field_info.annotation, field_info]
                 properties[prop_name] = {
-                    **type2schema(field),
-                    "description": field.field_info.description or prop_name,
+                    **type2schema(annotated_type),
+                    "description": field_info.description or prop_name,
                 }
-            # properties = {
-            #     prop_name: {
-            #         **type2schema(field.annotation),
-            #         "description": field.field_info.description or prop_name,
-            #     }
-            #     for prop_name, field in base_type.__fields__.items()
-            # }
-            model_description = base_type.__doc__ or getattr(base_type.Config, "title", "")
+
+            model_description = (
+                base_type.__doc__
+                or getattr(base_type, "Config", type("Config", (), {"title": ""})).title
+            )
             schema = {
                 "type": "object",
                 "properties": properties,
@@ -118,7 +115,6 @@ def type2schema(annotation: Any) -> Dict[str, Any]:
 
     print(f"Generated schema: {schema}")
     return schema
-
 
 
 def get_parameter_json_schema(
@@ -185,8 +181,10 @@ if __name__ == "__main__":
 
     from pydantic import Field
 
-    test_annotation = Annotated[int, Field(description="The person's age, must be non-negative", ge=0)]
-    schema = type2schema(test_annotation)    
+    test_annotation = Annotated[
+        int, Field(description="The person's age, must be non-negative", ge=0)
+    ]
+    schema = type2schema(test_annotation)
     print(schema)
     # # Define a simple Pydantic model
     # from pydantic import BaseModel, Field

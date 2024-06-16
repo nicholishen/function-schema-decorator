@@ -157,42 +157,10 @@ if __name__ == '__main__':
         age: Annotated[int, Field(ge=0, description="The age of the person, must be non-negative")]
 
     # Define the function to be tested
-    def process_person(person: Annotated[Person, Field(description="A person object")]) -> str:
+    def process_person(person: Annotated[Person, Field(description="The person of interest.")]) -> str:
         """Processes a single person"""
         return f"Processed person named {person.name} aged {person.age}"
 
     # Generate schema
     schema = generate_function_schema(process_person)
-    # print("Generated Schema:\n", schema)
-
-    # # Valid response
-    # valid_person = {"name": "John", "age": 30}
-    # is_valid, result = validate_llm_response(valid_person, schema)
-    # print("Valid Response:", is_valid, result)
-
-    # # Invalid response: negative age
-    # invalid_person = {"name": "John", "age": -1}
-    # is_valid, result = validate_llm_response(invalid_person, schema)
-    # print("Invalid Response:", is_valid, result)
-    # print("Processed person:", process_person(Person(**valid_person)))
-
-    # def validate_response_func(value: Annotated[str, Field(description="A string value")]) -> dict:
-    #     """Function to test response validation"""
-    #     return {"value": value}
-
-    # schema = generate_function_schema(validate_response_func)
-    # print("Generated Schema:\n", schema)
-
-    # # Valid response
-    # valid_response = {"value": "test"}
-    # is_valid, valid_result = validate_llm_response(valid_response, schema)
-    # print("Valid Response:", is_valid, valid_result)
-    # print("Processed response:", validate_response_func(valid_response["value"]))
-    # print("Processed response:", validate_response_func(**valid_response))
-    # print("Processed response:", validate_response_func(**valid_response).dict())
-    # print("Processed response:", validate_response_func(**valid_response).model_dump())
-    # print("Processed response:", validate_response_func(**valid_response).json())
-    # print("Processed response:", validate_response_func(**valid_response).dict(by_alias=True))
-    # print("Processed response:", validate_response_func(**valid_response).json(by_alias=True))
-    # print("Processed response:", validate_response_func(**valid_response).dict(by_alias=True, exclude_unset=True))
-    # print("Processed response:", validate_response_func
+   
